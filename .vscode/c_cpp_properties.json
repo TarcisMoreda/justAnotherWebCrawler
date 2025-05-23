@@ -7,8 +7,7 @@
       "compilerPath": "/usr/bin/clang",
       "cStandard": "c23",
       "cppStandard": "c++23",
-      "intelliSenseMode": "linux-clang-x64",
-      "compileCommands": ["${workspaceFolder}/build/compile_commands.json"]
+      "intelliSenseMode": "linux-clang-x64"
     }
   ],
   "version": 4
