@@ -25,4 +25,10 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_link_libraries(${PROJECT_NAME} PRIVATE lexbor libcurl)
-target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra)
+target_compile_options(${PROJECT_NAME} PRIVATE
+    -Wall -Wextra -Wfatal-errors
+    $<$<CONFIG:Debug>:-O0 -g -DDEBUG>          # Debug flags
+    $<$<CONFIG:Release>:-O3 -DNDEBUG>          # Release flags
+    $<$<CONFIG:RelWithDebInfo>:-O2 -g>         # RelWithDebInfo flags
+    $<$<CONFIG:MinSizeRel>:-Os>
+)
