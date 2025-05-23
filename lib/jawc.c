@@ -35,7 +35,7 @@ size_t write_callback(char *data, size_t size, size_t nmemb, void *clientp)
         return 0;
 
     buf->data = ptr;
-    memcpy(&(buf->data[buf->size]), buf, real_size);
+    memcpy(&(buf->data[buf->size]), data, real_size);
     buf->size += real_size;
     buf->data[buf->size] = 0;
 

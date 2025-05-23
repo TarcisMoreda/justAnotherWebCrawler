@@ -1,4 +1,4 @@
-#include "jawc.h"
+#include <jawc.h>
 #include <stdio.h>
 
 int main()
