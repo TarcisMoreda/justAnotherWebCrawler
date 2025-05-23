@@ -11,29 +11,36 @@ typedef unsigned long ulong;
 #include <tidyenum.h>
 #include <tidyplatform.h>
 
-u_int32_t write_cb(char *in, u_int32_t size, u_int32_t nmemb, TidyBuffer *out) {
+u_int32_t write_cb(char *in, u_int32_t size, u_int32_t nmemb, TidyBuffer *out)
+{
   u_int32_t r = size * nmemb;
   tidyBufAppend(out, in, r);
   return r;
 }
 
-void dump_node(TidyDoc doc, TidyNode tnod, int indent) {
+void dump_node(TidyDoc doc, TidyNode tnod, int indent)
+{
   TidyNode child;
 
-  for (child = tidyGetChild(tnod); child; child = tidyGetNext(child)) {
+  for (child = tidyGetChild(tnod); child; child = tidyGetNext(child))
+  {
     ctmbstr name = tidyNodeGetName(child);
 
-    if (name) {
+    if (name)
+    {
       TidyAttr attr;
       printf("%*.*s%s", indent, indent, "<", name);
 
-      for (attr = tidyAttrFirst(child); attr; attr = tidyAttrNext(attr)) {
+      for (attr = tidyAttrFirst(child); attr; attr = tidyAttrNext(attr))
+      {
         printf("%s", tidyAttrName(attr));
         tidyAttrValue(attr) ? printf("=\"%s\"", tidyAttrValue(attr))
                             : printf(" ");
         printf(">\n");
       }
-    } else {
+    }
+    else
+    {
       TidyBuffer buf;
       tidyBufInit(&buf);
       tidyNodeGetText(doc, child, &buf);
@@ -44,8 +51,10 @@ void dump_node(TidyDoc doc, TidyNode tnod, int indent) {
   }
 }
 
-int main(int argc, char **argv) {
-  if (argc == 2) {
+int main(int argc, char **argv)
+{
+  if (argc == 2)
+  {
     CURL *curl;
     char curl_errbuf[CURL_ERROR_SIZE];
     TidyDoc tdoc;
@@ -68,19 +77,25 @@ int main(int argc, char **argv) {
 
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &docbuf);
     err = curl_easy_perform(curl);
-    if (!err) {
+    if (!err)
+    {
       err = tidyParseBuffer(tdoc, &docbuf);
-      if (err >= 0) {
+      if (err >= 0)
+      {
         err = tidyCleanAndRepair(tdoc);
-        if (err >= 0) {
+        if (err >= 0)
+        {
           err = tidyRunDiagnostics(tdoc);
-          if (err >= 0) {
+          if (err >= 0)
+          {
             dump_node(tdoc, tidyGetRoot(tdoc), 0);
             fprintf(stderr, "%s\n", tidy_errbuf.bp);
           }
         }
       }
-    } else {
+    }
+    else
+    {
       fprintf(stderr, "%s\n", curl_errbuf);
     }
 
@@ -90,7 +105,9 @@ int main(int argc, char **argv) {
     tidyRelease(tdoc);
 
     return err;
-  } else {
+  }
+  else
+  {
     printf("usage: %s <url>\n", argv[0]);
   }
   return 0;
