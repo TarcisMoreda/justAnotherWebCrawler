@@ -4,56 +4,50 @@
 #include "cc.h"
 #include "base.h"
 
-void print_text_nodes(lxb_dom_node_t *node)
-{
-  while (node != NULL)
-  {
-    if (node->type == LXB_DOM_NODE_TYPE_TEXT)
-    {
-      lxb_char_t *text;
-      size_t len;
-      text = lxb_dom_node_text_content(node, &len);
+#define MAX_URLS 100
+static uint8_t urls_visited = 0;
+static map(char *, u_int8_t) visited;
 
-      if (text != NULL)
-        printf("%.*s\n", (int)len, (char *)text);
-    }
-    print_text_nodes(lxb_dom_node_first_child(node));
-    node = lxb_dom_node_next(node);
-  }
-}
-
-void print_text(lxb_html_document_t *doc)
+void web_crawl(lxb_html_document_t *doc)
 {
-  lxb_dom_node_t *node = lxb_dom_interface_node(doc->body);
-  print_text_nodes(node);
-}
-
-void get_all_tags(lxb_html_document_t *doc)
-{
+  lxb_dom_collection_t *collection = jawc_get_all_by_attr(doc, "href", "http");
   lxb_dom_element_t *element = NULL;
-  lxb_dom_element_t *body = lxb_dom_interface_element(doc->body);
-  lxb_dom_collection_t *collection = lxb_dom_collection_make(&doc->dom_document, 128);
-  if (!collection)
-  {
-    fprintf(stderr, "Failed to create Collection object.\n");
-    return;
-  }
+  u_int8_t *url_visited = NULL;
 
-  lxb_status_t status = lxb_dom_elements_by_attr_begin(body, collection,
-                                                       (const lxb_char_t *)"href", 4,
-                                                       (const lxb_char_t *)"http", 4,
-                                                       1);
-
-  if (status)
-  {
-    fprintf(stderr, "Failed to get elements with 'href' attribute.\n");
-    return;
-  }
+  urls_visited += 1;
+  printf("Visited: %d\n", urls_visited);
 
   for (size_t i = 0; i < lxb_dom_collection_length(collection); i++)
   {
+    if (urls_visited == MAX_URLS)
+      return;
+
+    size_t value_len;
     element = lxb_dom_collection_element(collection, i);
-    serialize_node(lxb_dom_interface_node(element));
+    const lxb_char_t *attr = lxb_dom_element_get_attribute(element, (lxb_char_t *)"href", 4, &value_len);
+    url_visited = get(&visited, (char *)attr);
+    if (url_visited)
+    {
+      *url_visited += 1;
+      continue;
+    }
+
+    if (!insert(&visited, (char *)attr, 1))
+    {
+      fprintf(stderr, "Ran out of memory.\n");
+      return;
+    }
+
+    // serialize_node(lxb_dom_interface_node(element));
+
+    printf("%s\n", (char *)attr);
+    const char res = jawc_get_html((char *)attr);
+    if (res)
+    {
+      fprintf(stderr, "cURL failed: %s\n", curl_easy_strerror(res));
+      return;
+    }
+    jawc_parse_html(web_crawl);
   }
 
   lxb_dom_collection_destroy(collection, 1);
@@ -61,6 +55,13 @@ void get_all_tags(lxb_html_document_t *doc)
 
 int main()
 {
+  init(&visited);
+  if (!visited)
+  {
+    fprintf(stderr, "Failed to initialize visited url map.\n");
+    return 1;
+  }
+
   if (jawc_init())
   {
     fprintf(stderr, "Failed to initialize jawc.\n");
@@ -69,7 +70,7 @@ int main()
 
   printf("jawc init successful.\n");
 
-  char res = jawc_get_html("https://example.com");
+  const char res = jawc_get_html("https://www.google.com/");
   if (res)
   {
     fprintf(stderr, "cURL failed: %s\n", curl_easy_strerror(res));
@@ -78,8 +79,9 @@ int main()
 
   printf("jawc got url.\n");
 
-  jawc_parse_html(get_all_tags);
+  jawc_parse_html(web_crawl);
 
+  cleanup(&visited);
   jawc_destroy();
   return 0;
 }

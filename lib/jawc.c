@@ -102,3 +102,21 @@ char jawc_parse_html(void (*parse)(lxb_html_document_t *))
     parse(doc);
     return status;
 }
+
+lxb_dom_collection_t *jawc_get_all_by_attr(lxb_html_document_t *doc, const char *attr, const char *val)
+{
+    lxb_dom_element_t *body = lxb_dom_interface_element(doc->body);
+    lxb_dom_collection_t *collection = lxb_dom_collection_make(&doc->dom_document, 128);
+    if (!collection)
+        return NULL;
+
+    lxb_status_t status = lxb_dom_elements_by_attr_begin(body, collection,
+                                                         (const lxb_char_t *)attr, strlen(attr),
+                                                         (const lxb_char_t *)val, strlen(val),
+                                                         1);
+
+    if (status)
+        return NULL;
+
+    return collection;
+}
