@@ -94,11 +94,11 @@ char jawc_get_html(const char *const url)
  * @param parse A function that recieves two lexbor nodes, the first is the html head and the second is the body
  * @return char Returns a lxb_status_t response
  */
-char jawc_parse_html(void (*parse)(lxb_dom_node_t *, lxb_dom_node_t *))
+char jawc_parse_html(void (*parse)(lxb_html_document_t *))
 {
     lxb_status_t status = lxb_html_document_parse(doc, (lxb_char_t *)curl_res.data, curl_res.size);
     if (status)
         return status;
-    parse(lxb_dom_interface_node(doc->head), lxb_dom_interface_node(doc->body));
+    parse(doc);
     return status;
 }
