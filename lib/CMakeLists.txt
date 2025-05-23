@@ -3,7 +3,6 @@ cmake_minimum_required(VERSION 4.0.0)
 project(jawc)
 
 include(FetchContent)
-
 FetchContent_Declare(
     lexbor
     GIT_REPOSITORY  "https://github.com/lexbor/lexbor.git"
@@ -11,7 +10,6 @@ FetchContent_Declare(
     CMAKE_ARGS      -DBUILD_SHARED_LIBS=OFF
 )
 FetchContent_MakeAvailable(lexbor)
-
 FetchContent_Declare(
     curl
     GIT_REPOSITORY  "https://github.com/curl/curl.git"
@@ -23,8 +21,17 @@ FetchContent_MakeAvailable(curl)
 add_library(${PROJECT_NAME} STATIC jawc.c include/jawc.h)
 target_include_directories(${PROJECT_NAME} PUBLIC 
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${lexbor_SOURCE_DIR}/include
 )
-target_link_libraries(${PROJECT_NAME} PRIVATE lexbor libcurl)
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${curl_SOURCE_DIR}/include
+)
+
+target_link_libraries(${PROJECT_NAME}
+    PUBLIC lexbor
+    PRIVATE libcurl
+)
+
 target_compile_options(${PROJECT_NAME} PRIVATE
     -Wall -Wextra -Wfatal-errors
     $<$<CONFIG:Debug>:-O0 -g -DDEBUG>          # Debug flags

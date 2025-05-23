@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <curl/curl.h>
-#include <lexbor/html/html.h>
 
 /**
  * @brief Struct for the HTTP header
@@ -15,6 +14,7 @@ typedef struct
 
 static CURL *curl = NULL;
 static ResponseBuffer curl_res = {0};
+static lxb_html_document_t *doc = NULL;
 
 /**
  * @brief https://curl.se/libcurl/c/CURLOPT_WRITEFUNCTION.html
@@ -43,21 +43,22 @@ size_t write_callback(char *data, size_t size, size_t nmemb, void *clientp)
 }
 
 /**
- * @brief Initializes cURL for jawc use.
+ * @brief Initializes cURL for jawc use
  *
- * @return char 1 on sucess 0 on fail.
+ * @return char 0 on sucess 1 on fail
  */
 char jawc_init(void)
 {
+    doc = lxb_html_document_create();
     curl = curl_easy_init();
     if (!curl)
-        return 0;
+        return 1;
 
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &curl_res);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
-    return 1;
+    return 0;
 }
 
 /**
@@ -70,50 +71,34 @@ void jawc_destroy(void)
         free(curl_res.data);
     if (curl)
         curl_easy_cleanup(curl);
+    if (doc)
+        lxb_html_document_destroy(doc);
 }
 
-// void print_text_nodes(lxb_dom_node_t *node)
-// {
-//   while (node != NULL)
-//   {
-//     if (node->type == LXB_DOM_NODE_TYPE_TEXT)
-//     {
-//       lxb_char_t *text = lxb_dom_node_text_content(node, NULL);
-//       if (text != NULL)
-//       {
-//         printf("%s\n", (char *)text); // Print line by line
-//       }
-//     }
-//     // Recursively process child nodes
-//     print_text_nodes(lxb_dom_node_first_child(node));
-//     node = lxb_dom_node_next(node);
-//   }
-// }
+/**
+ * @brief Uses curl to get the html contents of a web page
+ *
+ * @param url       URL to the web page
+ * @return char     Returns a CURLcode response
+ */
+char jawc_get_html(const char *const url)
+{
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    CURLcode res = curl_easy_perform(curl);
+    return res;
+}
 
-// curl_easy_setopt(curl, CURLOPT_URL, "https://example.com");
-//   CURLcode res = curl_easy_perform(curl);
-//   if (res != CURLE_OK)
-//   {
-//     fprintf(stderr, "CURL failed: %s\n", curl_easy_strerror(res));
-//     free(buf.data);
-//     curl_easy_cleanup(curl);
-//     return 1;
-//   }
-//   // Parse HTML with Lexbor
-//   lxb_html_document_t *doc = lxb_html_document_create();
-//   lxb_status_t status = lxb_html_document_parse(doc, (lxb_char_t *)buf.data, buf.size);
-//   if (status != LXB_STATUS_OK)
-//   {
-//     fprintf(stderr, "Lexbor parsing failed\n");
-//     free(buf.data);
-//     lxb_html_document_destroy(doc);
-//     curl_easy_cleanup(curl);
-//     return 1;
-//   }
-//   // Print text content line by line
-//   print_text_nodes(lxb_dom_interface_node(doc->body));
-//   // Cleanup
-//   free(buf.data);
-//   lxb_html_document_destroy(doc);
-//   curl_easy_cleanup(curl);
-//   return 0;
+/**
+ * @brief Parses the html using lexbor and run the parse function
+ *
+ * @param parse A function that recieves two lexbor nodes, the first is the html head and the second is the body
+ * @return char Returns a lxb_status_t response
+ */
+char jawc_parse_html(void (*parse)(lxb_dom_node_t *, lxb_dom_node_t *))
+{
+    lxb_status_t status = lxb_html_document_parse(doc, (lxb_char_t *)curl_res.data, curl_res.size);
+    if (status)
+        return status;
+    parse(lxb_dom_interface_node(doc->head), lxb_dom_interface_node(doc->body));
+    return status;
+}
