@@ -1,114 +1,89 @@
-#include <curl/curl.h>
-#include <curl/easy.h>
 #include <stdio.h>
-#include <sys/types.h>
+#include <stdlib.h>
+#include <string.h>
+#include <curl/curl.h>
+#include "lexbor/html/html.h"
 
-typedef u_int32_t uint;
-typedef unsigned long ulong;
-
-#include <tidy.h>
-#include <tidybuffio.h>
-#include <tidyenum.h>
-#include <tidyplatform.h>
-
-u_int32_t write_cb(char *in, u_int32_t size, u_int32_t nmemb, TidyBuffer *out)
+// Callback to store HTTP response in a buffer
+typedef struct
 {
-  u_int32_t r = size * nmemb;
-  tidyBufAppend(out, in, r);
-  return r;
+  char *data;
+  size_t size;
+} ResponseBuffer;
+
+size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userdata)
+{
+  ResponseBuffer *buf = (ResponseBuffer *)userdata;
+  size_t new_size = buf->size + size * nmemb;
+  buf->data = realloc(buf->data, new_size + 1);
+  memcpy(buf->data + buf->size, ptr, size * nmemb);
+  buf->data[new_size] = '\0';
+  buf->size = new_size;
+  return size * nmemb;
 }
 
-void dump_node(TidyDoc doc, TidyNode tnod, int indent)
+// Recursively print text nodes (line by line)
+void print_text_nodes(lxb_dom_node_t *node)
 {
-  TidyNode child;
-
-  for (child = tidyGetChild(tnod); child; child = tidyGetNext(child))
+  while (node != NULL)
   {
-    ctmbstr name = tidyNodeGetName(child);
-
-    if (name)
+    if (node->type == LXB_DOM_NODE_TYPE_TEXT)
     {
-      TidyAttr attr;
-      printf("%*.*s%s", indent, indent, "<", name);
-
-      for (attr = tidyAttrFirst(child); attr; attr = tidyAttrNext(attr))
+      lxb_char_t *text = lxb_dom_node_text_content(node, NULL);
+      if (text != NULL)
       {
-        printf("%s", tidyAttrName(attr));
-        tidyAttrValue(attr) ? printf("=\"%s\"", tidyAttrValue(attr))
-                            : printf(" ");
-        printf(">\n");
+        printf("%s\n", (char *)text); // Print line by line
       }
     }
-    else
-    {
-      TidyBuffer buf;
-      tidyBufInit(&buf);
-      tidyNodeGetText(doc, child, &buf);
-      printf("%*.*s\n", indent, indent, buf.bp ? (char *)buf.bp : "");
-      tidyBufFree(&buf);
-    }
-    dump_node(doc, child, indent + 4);
+    // Recursively process child nodes
+    print_text_nodes(lxb_dom_node_first_child(node));
+    node = lxb_dom_node_next(node);
   }
 }
 
-int main(int argc, char **argv)
+int main()
 {
-  if (argc == 2)
+  CURL *curl = curl_easy_init();
+  if (!curl)
   {
-    CURL *curl;
-    char curl_errbuf[CURL_ERROR_SIZE];
-    TidyDoc tdoc;
-    TidyBuffer docbuf = {0};
-    TidyBuffer tidy_errbuf = {0};
-    int err;
+    fprintf(stderr, "Failed to initialize CURL\n");
+    return 1;
+  }
 
-    curl = curl_easy_init();
-    curl_easy_setopt(curl, CURLOPT_URL, argv[1]);
-    curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curl_errbuf);
-    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
-    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
+  // Fetch URL
+  ResponseBuffer buf = {0};
+  curl_easy_setopt(curl, CURLOPT_URL, "https://example.com");
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buf);
+  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L); // Follow redirects
 
-    tdoc = tidyCreate();
-    tidyOptSetBool(tdoc, TidyForceOutput, yes);
-    tidyOptSetInt(tdoc, TidyWrapLen, 4096);
-    tidySetErrorBuffer(tdoc, &tidy_errbuf);
-    tidyBufInit(&docbuf);
-
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &docbuf);
-    err = curl_easy_perform(curl);
-    if (!err)
-    {
-      err = tidyParseBuffer(tdoc, &docbuf);
-      if (err >= 0)
-      {
-        err = tidyCleanAndRepair(tdoc);
-        if (err >= 0)
-        {
-          err = tidyRunDiagnostics(tdoc);
-          if (err >= 0)
-          {
-            dump_node(tdoc, tidyGetRoot(tdoc), 0);
-            fprintf(stderr, "%s\n", tidy_errbuf.bp);
-          }
-        }
-      }
-    }
-    else
-    {
-      fprintf(stderr, "%s\n", curl_errbuf);
-    }
-
+  CURLcode res = curl_easy_perform(curl);
+  if (res != CURLE_OK)
+  {
+    fprintf(stderr, "CURL failed: %s\n", curl_easy_strerror(res));
+    free(buf.data);
     curl_easy_cleanup(curl);
-    tidyBufFree(&docbuf);
-    tidyBufFree(&tidy_errbuf);
-    tidyRelease(tdoc);
+    return 1;
+  }
 
-    return err;
-  }
-  else
+  // Parse HTML with Lexbor
+  lxb_html_document_t *doc = lxb_html_document_create();
+  lxb_status_t status = lxb_html_document_parse(doc, (lxb_char_t *)buf.data, buf.size);
+  if (status != LXB_STATUS_OK)
   {
-    printf("usage: %s <url>\n", argv[0]);
+    fprintf(stderr, "Lexbor parsing failed\n");
+    free(buf.data);
+    lxb_html_document_destroy(doc);
+    curl_easy_cleanup(curl);
+    return 1;
   }
+
+  // Print text content line by line
+  print_text_nodes(lxb_dom_interface_node(doc->body));
+
+  // Cleanup
+  free(buf.data);
+  lxb_html_document_destroy(doc);
+  curl_easy_cleanup(curl);
   return 0;
 }
