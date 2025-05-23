@@ -1,6 +1,6 @@
 [submodule "curl"]
-	path = deps/curl
+	path = submodules/curl
 	url = https://github.com/curl/curl.git
 [submodule "tidy-html5"]
-	path = deps/tidy-html5
+	path = submodules/tidy-html5
 	url = https://github.com/htacg/tidy-html5.git
