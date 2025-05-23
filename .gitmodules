@@ -2,5 +2,5 @@
 	path = deps/curl
 	url = https://github.com/curl/curl.git
 [submodule "tidy-html5"]
-	path = tidy-html5
+	path = deps/tidy-html5
 	url = https://github.com/htacg/tidy-html5.git
