@@ -1,13 +1,24 @@
 #include <jawc.h>
 #include <stdio.h>
 #include <curl/curl.h>
+#include <lexbor/html/html.h>
+// https://github.com/JacksonAllan/CC
 #include "cc.h"
+// Directly from the lexbor examples
 #include "base.h"
 
-#define MAX_URLS 100
+// Max sites visited by crawler, will change algo to BFS and this to MAX_DEPTH
+#define MAX_URLS 10
+// Site counter
 static uint8_t urls_visited = 0;
+// Maps url to number of times it is referenced
 static map(char *, u_int8_t) visited;
 
+/**
+ * @brief Crawls through a page, gets every href and maps it to the visited url map, then crawls them in order
+ *
+ * @param doc Page to be crawled
+ */
 void web_crawl(lxb_html_document_t *doc)
 {
   lxb_dom_collection_t *collection = jawc_get_all_by_attr(doc, "href", "http");
@@ -38,9 +49,9 @@ void web_crawl(lxb_html_document_t *doc)
       return;
     }
 
-    // serialize_node(lxb_dom_interface_node(element));
+    serialize_node(lxb_dom_interface_node(element));
+    // printf("%s\n", (char *)attr);
 
-    printf("%s\n", (char *)attr);
     const char res = jawc_get_html((char *)attr);
     if (res)
     {
